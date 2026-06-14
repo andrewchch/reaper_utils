@@ -174,6 +174,7 @@ def print_report(
             else:
                 print("  (no audio/MIDI files referenced)")
     if orphaned:
+        print("---------------\nOrphaned Files\n---------------")
         for path in sorted(orphaned):
             print(path)
 
