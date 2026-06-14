@@ -44,6 +44,57 @@ def test_project_file_argument_limits_scan(tmp_path: Path):
     assert {p.name for p in orphaned} == {"orphan.wav"}
 
 
+def test_collect_project_audio_references_groups_files_by_project(tmp_path: Path):
+    used_a = tmp_path / "used_a.wav"
+    used_b = tmp_path / "used_b.mid"
+    used_a.write_text("data")
+    used_b.write_text("data")
+    first = tmp_path / "first.rpp"
+    second = tmp_path / "second.rpp"
+    first.write_text('FILE "used_a.wav"\nFILE "used_b.mid"\n', encoding="utf-8")
+    second.write_text('FILE "used_b.mid"\n', encoding="utf-8")
+
+    references = script.collect_project_audio_references(
+        [first.resolve(), second.resolve()], script.parse_audio_types(None)
+    )
+
+    assert references == {
+        first.resolve(): [used_a.resolve(), used_b.resolve()],
+        second.resolve(): [used_b.resolve()],
+    }
+
+
+def test_print_report_lists_referenced_audio_files_per_project(tmp_path: Path, capsys):
+    used = tmp_path / "used.wav"
+    orphan = tmp_path / "orphan.wav"
+    used.write_text("data")
+    orphan.write_text("data")
+    project = tmp_path / "project.rpp"
+    project.write_text('FILE "used.wav"\n', encoding="utf-8")
+
+    script.print_report(
+        {used.resolve(), orphan.resolve()},
+        [project.resolve()],
+        {orphan.resolve()},
+        project_references={project.resolve(): [used.resolve()]},
+    )
+
+    assert capsys.readouterr().out.splitlines() == [
+        "Audio/MIDI files found: 2",
+        "Project files scanned: 1",
+        "Orphaned files: 1",
+        str(project.resolve()),
+        f"  {used.resolve()}",
+        str(orphan.resolve()),
+    ]
+
+
+def test_build_parser_supports_listing_referenced_audio_files():
+    args = script.build_parser().parse_args(["/tmp/project", "--list_referenced_audio_files"])
+
+    assert args.list_referenced_audio_files is True
+
+
 def test_delete_orphaned_moves_to_recycle_bin(tmp_path: Path, monkeypatch):
     orphan = tmp_path / "orphan.wav"
     orphan.write_text("data")
