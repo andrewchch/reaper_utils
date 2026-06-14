@@ -8,6 +8,7 @@ import os
 import re
 import shutil
 import sys
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 
 DEFAULT_AUDIO_TYPES = {
@@ -79,14 +80,25 @@ def _normalize_reference_path(value: str, project_dir: Path) -> Path:
     return (project_dir / candidate).resolve()
 
 
-def collect_referenced_audio_files(project_files: list[Path], audio_types: set[str]) -> set[Path]:
-    referenced: set[Path] = set()
+def collect_project_audio_references(
+    project_files: list[Path], audio_types: set[str]
+) -> dict[Path, list[Path]]:
+    references: dict[Path, set[Path]] = {}
     for project in project_files:
+        project_references: set[Path] = set()
         content = project.read_text(encoding="utf-8", errors="replace")
         for value in REFERENCE_PATTERN.findall(content):
             normalized = _normalize_reference_path(value, project.parent)
             if normalized.suffix.lower() in audio_types:
-                referenced.add(normalized)
+                project_references.add(normalized)
+        references[project] = project_references
+    return {project: sorted(paths) for project, paths in references.items()}
+
+
+def collect_referenced_audio_files(project_files: list[Path], audio_types: set[str]) -> set[Path]:
+    referenced: set[Path] = set()
+    for paths in collect_project_audio_references(project_files, audio_types).values():
+        referenced.update(paths)
     return referenced
 
 
@@ -143,11 +155,26 @@ def move_to_recycle_bin(path: Path) -> Path:
     return Path(shutil.move(str(path), str(destination)))
 
 
-def print_report(audio_files: set[Path], project_files: list[Path], orphaned: set[Path]) -> None:
+def print_report(
+    audio_files: set[Path],
+    project_files: list[Path],
+    orphaned: set[Path],
+    project_references: Mapping[Path, Sequence[Path]] | None = None,
+) -> None:
     print(f"Audio/MIDI files found: {len(audio_files)}")
     print(f"Project files scanned: {len(project_files)}")
     print(f"Orphaned files: {len(orphaned)}")
+    if project_references is not None:
+        for project in project_files:
+            print(project)
+            references = project_references.get(project, ())
+            if references:
+                for path in references:
+                    print(f"  {path}")
+            else:
+                print("  (no audio/MIDI files referenced)")
     if orphaned:
+        print("---------------\nOrphaned Files\n---------------")
         for path in sorted(orphaned):
             print(path)
 
@@ -187,6 +214,11 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Prompt to move orphaned files to the recycle bin.",
     )
+    parser.add_argument(
+        "--list_referenced_audio_files",
+        action="store_true",
+        help="List referenced audio/MIDI files for each scanned project file.",
+    )
     return parser
 
 
@@ -199,7 +231,12 @@ def main() -> int:
         audio_types=args.audio_types,
         ignore_backups=args.ignore_backups,
     )
-    print_report(audio_files, project_files, orphaned)
+    project_references = None
+    if args.list_referenced_audio_files:
+        project_references = collect_project_audio_references(
+            project_files, parse_audio_types(args.audio_types)
+        )
+    print_report(audio_files, project_files, orphaned, project_references=project_references)
     maybe_delete_orphaned(orphaned, args.delete_orphaned_audio_files)
     return 0
 
