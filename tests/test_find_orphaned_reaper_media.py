@@ -85,7 +85,11 @@ def test_print_report_lists_referenced_audio_files_per_project(tmp_path: Path, c
         "Orphaned files: 1",
         str(project.resolve()),
         f"  {used.resolve()}",
+        "---------------",
+        "Orphaned Files",
+        "---------------",
         str(orphan.resolve()),
+        f"Total orphaned files size: {script.format_size(orphan.resolve().stat().st_size)}",
     ]
 
 
@@ -158,3 +162,24 @@ def test_recycle_bin_directory_platform_selection(tmp_path: Path):
     assert script.recycle_bin_directory(tmp_path, "darwin") == tmp_path / ".Trash"
     assert script.recycle_bin_directory(tmp_path, "windows") == tmp_path / "Recycle.Bin"
     assert script.recycle_bin_directory(tmp_path, "linux") == tmp_path / ".local" / "share" / "Trash" / "files"
+
+
+def test_format_size_returns_human_readable_string():
+    assert script.format_size(0) == "0.0 B"
+    assert script.format_size(512) == "512.0 B"
+    assert script.format_size(1024) == "1.0 KB"
+    assert script.format_size(1536) == "1.5 KB"
+    assert script.format_size(1024 * 1024) == "1.0 MB"
+    assert script.format_size(1024 * 1024 * 1024) == "1.0 GB"
+
+
+def test_print_report_shows_total_orphaned_size(tmp_path: Path, capsys):
+    orphan_a = tmp_path / "orphan_a.wav"
+    orphan_b = tmp_path / "orphan_b.wav"
+    orphan_a.write_bytes(b"x" * 100)
+    orphan_b.write_bytes(b"x" * 924)
+
+    script.print_report(set(), [], {orphan_a.resolve(), orphan_b.resolve()})
+
+    out = capsys.readouterr().out
+    assert "Total orphaned files size: 1.0 KB" in out
