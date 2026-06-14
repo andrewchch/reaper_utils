@@ -81,7 +81,7 @@ def _normalize_reference_path(value: str, project_dir: Path) -> Path:
 def collect_referenced_audio_files(project_files: list[Path], audio_types: set[str]) -> set[Path]:
     referenced: set[Path] = set()
     for project in project_files:
-        content = project.read_text(encoding="utf-8", errors="ignore")
+        content = project.read_text(encoding="utf-8", errors="replace")
         for value in REFERENCE_PATTERN.findall(content):
             normalized = _normalize_reference_path(value, project.parent)
             if normalized.suffix.lower() in audio_types:
@@ -132,13 +132,14 @@ def move_to_recycle_bin(path: Path) -> Path:
     if destination.exists():
         stem = path.stem
         suffix = path.suffix
-        index = 1
-        while True:
+        max_attempts = 10_000
+        for index in range(1, max_attempts + 1):
             candidate = destination_dir / f"{stem}_{index}{suffix}"
             if not candidate.exists():
                 destination = candidate
                 break
-            index += 1
+        else:
+            raise RuntimeError(f"could not find a free recycle bin name for {path}")
     return Path(shutil.move(str(path), str(destination)))
 
 

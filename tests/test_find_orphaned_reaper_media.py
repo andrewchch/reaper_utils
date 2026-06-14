@@ -75,3 +75,4 @@ def test_move_to_recycle_bin_handles_name_collision(tmp_path: Path, monkeypatch)
 def test_recycle_bin_directory_platform_selection(tmp_path: Path):
     assert script.recycle_bin_directory(tmp_path, "darwin") == tmp_path / ".Trash"
     assert script.recycle_bin_directory(tmp_path, "windows") == tmp_path / "Recycle.Bin"
+    assert script.recycle_bin_directory(tmp_path, "linux") == tmp_path / ".local" / "share" / "Trash" / "files"
