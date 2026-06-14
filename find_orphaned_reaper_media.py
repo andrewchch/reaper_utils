@@ -172,7 +172,7 @@ def print_report(
                 for path in references:
                     print(f"  {path}")
             else:
-                print("  (none)")
+                print("  (no audio/MIDI files referenced)")
     if orphaned:
         for path in sorted(orphaned):
             print(path)

@@ -95,6 +95,26 @@ def test_build_parser_supports_listing_referenced_audio_files():
     assert args.list_referenced_audio_files is True
 
 
+def test_print_report_describes_projects_without_referenced_audio_files(tmp_path: Path, capsys):
+    project = tmp_path / "empty.rpp"
+    project.write_text("", encoding="utf-8")
+
+    script.print_report(
+        set(),
+        [project.resolve()],
+        set(),
+        project_references={project.resolve(): []},
+    )
+
+    assert capsys.readouterr().out.splitlines() == [
+        "Audio/MIDI files found: 0",
+        "Project files scanned: 1",
+        "Orphaned files: 0",
+        str(project.resolve()),
+        "  (no audio/MIDI files referenced)",
+    ]
+
+
 def test_delete_orphaned_moves_to_recycle_bin(tmp_path: Path, monkeypatch):
     orphan = tmp_path / "orphan.wav"
     orphan.write_text("data")
