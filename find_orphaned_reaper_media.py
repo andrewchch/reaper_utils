@@ -108,11 +108,18 @@ def find_orphaned_audio_files(
 
 
 def recycle_bin_directory(home_dir: Path | None = None, platform_name: str | None = None) -> Path:
-    platform_name = platform_name or os.name
+    if platform_name is None:
+        if os.name == "nt":
+            platform_name = "windows"
+        elif sys.platform == "darwin":
+            platform_name = "darwin"
+        else:
+            platform_name = "linux"
     home = home_dir or Path.home()
-    if platform_name == "nt":
+    platform_name = platform_name.lower()
+    if platform_name in {"nt", "windows"}:
         return home / "Recycle.Bin"
-    if platform_name == "posix" and sys.platform == "darwin":
+    if platform_name in {"darwin", "mac", "macos"}:
         return home / ".Trash"
     return home / ".local" / "share" / "Trash" / "files"
 
