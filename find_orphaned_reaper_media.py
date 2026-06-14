@@ -10,6 +10,8 @@ import shutil
 import sys
 from collections.abc import Mapping, Sequence
 from pathlib import Path
+from tqdm import tqdm
+from send2trash import send2trash
 
 DEFAULT_AUDIO_TYPES = {
     ".wav",
@@ -59,17 +61,17 @@ def collect_project_files(
     if project_file:
         selected = Path(project_file).expanduser().resolve()
         selected_name = selected.name.lower()
-        if not (selected_name.endswith(".rpp") or selected_name.endswith(".rpp.bak")):
-            raise ValueError("project_file must be a .rpp or .rpp.bak file")
+        if not (selected_name.endswith(".rpp") or selected_name.endswith(".rpp-bak")):
+            raise ValueError("project_file must be a .rpp or .rpp-bak file")
         if not selected.is_file():
             raise FileNotFoundError(f"project file not found: {selected}")
-        if ignore_backups and selected_name.endswith(".rpp.bak"):
+        if ignore_backups and selected_name.endswith(".rpp-bak"):
             return []
         return [selected]
 
     project_files = sorted(start_directory.rglob("*.rpp"))
     if not ignore_backups:
-        project_files.extend(sorted(start_directory.rglob("*.rpp.bak")))
+        project_files.extend(sorted(start_directory.rglob("*.rpp-bak")))
     return [path.resolve() for path in project_files]
 
 
@@ -84,7 +86,7 @@ def collect_project_audio_references(
     project_files: list[Path], audio_types: set[str]
 ) -> dict[Path, list[Path]]:
     references: dict[Path, set[Path]] = {}
-    for project in project_files:
+    for project in tqdm(project_files, desc="Scanning projects for audio/MIDI references", unit="project"):
         project_references: set[Path] = set()
         content = project.read_text(encoding="utf-8", errors="replace")
         for value in REFERENCE_PATTERN.findall(content):
@@ -97,7 +99,7 @@ def collect_project_audio_references(
 
 def collect_referenced_audio_files(project_files: list[Path], audio_types: set[str]) -> set[Path]:
     referenced: set[Path] = set()
-    for paths in collect_project_audio_references(project_files, audio_types).values():
+    for paths in tqdm(collect_project_audio_references(project_files, audio_types).values(), desc="Collecting referenced audio/MIDI files", unit="project"):
         referenced.update(paths)
     return referenced
 
@@ -112,9 +114,21 @@ def find_orphaned_audio_files(
     if not root.is_dir():
         raise NotADirectoryError(f"start_directory does not exist: {root}")
 
+    # Display whether we are ignoring backup files or not
+    if ignore_backups:
+        print("Ignoring backup project files (.rpp-bak)")
+    else:
+        print("Including backup project files (.rpp-bak)")
+
     selected_audio_types = parse_audio_types(audio_types)
     audio_files = collect_audio_files(root, selected_audio_types)
     project_files = collect_project_files(root, ignore_backups, project_file)
+
+    # Display the number of *.rpp and the number of *.rpp-bak files found
+    rpp_count = sum(1 for p in project_files if p.suffix.lower() == ".rpp")
+    bak_count = sum(1 for p in project_files if p.suffix.lower() == ".rpp-bak")
+    print(f"Found {rpp_count} .rpp files and {bak_count} .rpp-bak files")
+
     referenced = collect_referenced_audio_files(project_files, selected_audio_types)
     orphaned = {audio for audio in audio_files if audio not in referenced}
     return audio_files, project_files, referenced, orphaned
@@ -138,6 +152,7 @@ def recycle_bin_directory(home_dir: Path | None = None, platform_name: str | Non
 
 
 def move_to_recycle_bin(path: Path) -> Path:
+    """
     destination_dir = recycle_bin_directory()
     destination_dir.mkdir(parents=True, exist_ok=True)
 
@@ -153,6 +168,13 @@ def move_to_recycle_bin(path: Path) -> Path:
         else:
             raise RuntimeError(f"could not find a free recycle bin name for {path}")
     return Path(shutil.move(str(path), str(destination)))
+    """
+    try:
+        send2trash(str(path))
+        return path
+    except Exception as e:
+        print(f"Error moving {path} to recycle bin: {e}")
+        raise
 
 
 def format_size(num_bytes: int) -> str:
@@ -202,17 +224,17 @@ def maybe_delete_orphaned(orphaned: set[Path], delete_orphaned_audio_files: bool
         return
     for path in sorted(orphaned):
         moved_to = move_to_recycle_bin(path)
-        print(f"Moved to recycle bin: {path} -> {moved_to}")
+        print(f"Moved to recycle bin: {path}")
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Find audio/MIDI files not referenced in Reaper .rpp/.rpp.bak project files."
+        description="Find audio/MIDI files not referenced in Reaper .rpp/.rpp-bak project files."
     )
     parser.add_argument("start_directory", help="Directory to scan recursively for audio/MIDI files.")
     parser.add_argument(
         "--project_file",
-        help="Optional single .rpp or .rpp.bak project file to scan for references.",
+        help="Optional single .rpp or .rpp-bak project file to scan for references.",
     )
     parser.add_argument(
         "--audio_types",
@@ -221,7 +243,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--ignore_backups",
         action="store_true",
-        help="Ignore .rpp.bak files when finding project files.",
+        help="Ignore .rpp-bak files when finding project files.",
     )
     parser.add_argument(
         "--delete_orphaned_audio_files",
