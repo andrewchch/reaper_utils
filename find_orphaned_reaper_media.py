@@ -26,7 +26,7 @@ DEFAULT_AUDIO_TYPES = {
     ".midi",
 }
 
-REFERENCE_PATTERN = re.compile(r'"([^"\r\n]+\.[A-Za-z0-9]+)"')
+REFERENCE_PATTERN = re.compile(r'"([^"\r\n]+)"')
 MAX_RECYCLE_BIN_RENAME_ATTEMPTS = 10_000
 
 
