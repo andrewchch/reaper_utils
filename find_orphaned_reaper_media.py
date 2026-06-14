@@ -155,6 +155,13 @@ def move_to_recycle_bin(path: Path) -> Path:
     return Path(shutil.move(str(path), str(destination)))
 
 
+def format_size(num_bytes: int) -> str:
+    for unit in ("B", "KB", "MB", "GB", "TB"):
+        if num_bytes < 1024 or unit == "TB":
+            return f"{num_bytes:.1f} {unit}"
+        num_bytes /= 1024
+
+
 def print_report(
     audio_files: set[Path],
     project_files: list[Path],
@@ -177,6 +184,13 @@ def print_report(
         print("---------------\nOrphaned Files\n---------------")
         for path in sorted(orphaned):
             print(path)
+        total_size = 0
+        for path in orphaned:
+            try:
+                total_size += path.stat().st_size
+            except FileNotFoundError:
+                pass
+        print(f"Total orphaned files size: {format_size(total_size)}")
 
 
 def maybe_delete_orphaned(orphaned: set[Path], delete_orphaned_audio_files: bool) -> None:
