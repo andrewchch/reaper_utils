@@ -27,6 +27,7 @@ DEFAULT_AUDIO_TYPES = {
 }
 
 REFERENCE_PATTERN = re.compile(r'"([^"\r\n]+\.[A-Za-z0-9]+)"')
+MAX_RECYCLE_BIN_RENAME_ATTEMPTS = 10_000
 
 
 def parse_audio_types(raw_value: str | None) -> set[str]:
@@ -132,8 +133,7 @@ def move_to_recycle_bin(path: Path) -> Path:
     if destination.exists():
         stem = path.stem
         suffix = path.suffix
-        max_attempts = 10_000
-        for index in range(1, max_attempts + 1):
+        for index in range(1, MAX_RECYCLE_BIN_RENAME_ATTEMPTS + 1):
             candidate = destination_dir / f"{stem}_{index}{suffix}"
             if not candidate.exists():
                 destination = candidate
