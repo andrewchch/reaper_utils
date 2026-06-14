@@ -13,6 +13,7 @@ def test_find_orphaned_files_with_discovered_projects(tmp_path: Path):
 
     assert [p.name for p in project_files] == ["project.rpp"]
     assert {p.name for p in orphaned} == {"orphan.wav"}
+    assert "song.mid" not in {p.name for p in orphaned}
 
 
 def test_ignore_backups_excludes_rpp_bak(tmp_path: Path):
@@ -54,6 +55,16 @@ def test_delete_orphaned_moves_to_recycle_bin(tmp_path: Path, monkeypatch):
 
     assert not orphan.exists()
     assert (target / "orphan.wav").exists()
+
+
+def test_delete_orphaned_cancels_on_non_yes(tmp_path: Path, monkeypatch):
+    orphan = tmp_path / "orphan.wav"
+    orphan.write_text("data")
+    monkeypatch.setattr("builtins.input", lambda _: "n")
+
+    script.maybe_delete_orphaned({orphan.resolve()}, delete_orphaned_audio_files=True)
+
+    assert orphan.exists()
 
 
 def test_move_to_recycle_bin_handles_name_collision(tmp_path: Path, monkeypatch):
