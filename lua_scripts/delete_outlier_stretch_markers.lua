@@ -268,7 +268,7 @@ end
 --------------------------------------------------------------------
 
 local msg = string.format(
-    "Delete %d stretch marker(s) that are more than %.1f ms from the nearest grid line?",
+    "Delete %d stretch marker(s) that are more than %.1f ms from the nearest grid line or too close to the previous valid marker?",
     #to_delete, threshold_ms
 )
 local confirm = reaper.ShowMessageBox(msg, "Confirm Deletion", 4)
