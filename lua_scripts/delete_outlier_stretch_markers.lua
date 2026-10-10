@@ -195,6 +195,8 @@ for i = 0, num_selected - 1 do
             local num_markers = reaper.GetTakeNumStretchMarkers(take)
             log("    stretch marker count (post-crop): " .. num_markers)
 
+            local last_valid_pos = nil  -- project position of the last kept marker
+
             for m = 0, num_markers - 1 do
                 local retval, pos, srcpos = reaper.GetTakeStretchMarker(take, m)
                 if retval then
@@ -218,10 +220,27 @@ for i = 0, num_selected - 1 do
                             grid_pos, dist, tostring(over)
                         ))
 
-                        if over then
+                        -- Too close to the previous valid marker (< 1 quarter note,
+                        -- measured using the tempo at that marker)
+                        local too_close = false
+                        if last_valid_pos then
+                            local last_qn = reaper.TimeMap2_timeToQN(0, last_valid_pos)
+                            local qn_interval = reaper.TimeMap2_QNToTime(0, last_qn + 1) - last_valid_pos
+                            too_close = (proj_pos - last_valid_pos) < qn_interval
+                            log(string.format(
+                                "        last_valid_pos=%.9f  qn_interval=%.9f  too_close=%s",
+                                last_valid_pos, qn_interval, tostring(too_close)
+                            ))
+                        end
+
+                        if over or too_close then
                             table.insert(to_delete, {take = take, idx = m})
                             log("        >>> QUEUED FOR DELETION")
+                        else
+                            last_valid_pos = proj_pos
                         end
+                    else
+                        last_valid_pos = proj_pos
                     end
                 else
                     log("    SM[" .. m .. "]: GetTakeStretchMarker returned false")
